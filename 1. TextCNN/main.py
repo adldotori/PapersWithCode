@@ -11,23 +11,21 @@ from core.trainer import Trainer
 
 def get_args():
     parser = argparse.ArgumentParser(description='Executer')
-    parser.add_argument('--mode', type=str, default='train', choices=['train', 'infer'])
     parser.add_argument('--name', type=str, default='base')
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--step', type=int, default=1000000)
+    parser.add_argument('--ck_path', type=str, default='checkpoint/')
+    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--path', type=str, default='data')
-    parser.add_argument('--kor_token_path', type=str, default='kor_token.pkl')
-    parser.add_argument('--eng_token_path', type=str, default='eng_token.pkl')
-    parser.add_argument('--kor_vocab_path', type=str, default='kor.pkl')
-    parser.add_argument('--eng_vocab_path', type=str, default='eng.pkl')
-    parser.add_argument('-b', '--batch_size', type=int, default=16)
+    parser.add_argument('--embedding_dim', type=int, default=100)
+    parser.add_argument('--n_filters', type=int, default=100)
+    parser.add_argument('--filter_sizes', type=list, default=[3,4,5])
+    parser.add_argument('--output_dim', type=int, default=1)
+    parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--pad_idx', type=int, default=0)
     args = parser.parse_args()
     return args
 
 if __name__ == '__main__':
     args = get_args()
     trainer = Trainer(args)
-    if args.mode == 'train':
-        trainer.train()
-    else:
-        trainer.infer()
+    trainer.train()

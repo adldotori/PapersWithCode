@@ -19,14 +19,19 @@ from gensim.models import Word2Vec
 
 
 class Vocabulary(object):
+    PAD_TOKEN = '<pad>'
+    SOS_TOKEN = '<sos>'
+    EOS_TOKEN = '<eos>'
+    UNK_TOKEN = '<unk>'
+
     def __init__(self):
         self.word2idx = {}
         self.idx2word = {}
         self.idx = 0
-        self._add('<pad>')
-        self._add('<sos>')
-        self._add('<eos>')
-        self._add('<unk>')
+        self._add(self.PAD_TOKEN)
+        self._add(self.SOS_TOKEN)
+        self._add(self.EOS_TOKEN)
+        self._add(self.UNK_TOKEN)
 
     def _add(self, word):
         if not word in self.word2idx:
@@ -51,6 +56,11 @@ class CustomDataset(Dataset):
         super(Dataset, self).__init__()
 
         self.args = args
+        
+        # make directory if not exist data path
+        if not osp.isdir(args.path): 
+            os.makedirs(args.path, exist_ok=True)
+
         self.vocab = Vocabulary()
         self._build_vocab()
         print('>>> Dataset loading...')
@@ -68,6 +78,7 @@ class CustomDataset(Dataset):
         """
         text, label = zip(*data)
         text = pad_sequence(text, batch_first=True, padding_value=self.vocab('<pad>'))
+        label = torch.stack(label, 0)
         return text, label
 
     def _build_vocab(self):
@@ -127,7 +138,7 @@ class CustomDataset(Dataset):
         return string.split(' ')
 
     def __getitem__(self, index):
-        return torch.tensor(self.dataset[index][0]), torch.tensor(self.dataset[index][1])
+        return torch.tensor(self.dataset[index][0]), torch.tensor(float(self.dataset[index][1]))
 
     def __len__(self):
         return len(self.dataset)

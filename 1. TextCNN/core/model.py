@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model = CNN1d(1000, args)
+    model = CNN1d(1000, args).to(device)
     sample = torch.randint(20, (3, 5)).to(device)
     res = model(sample)
 
