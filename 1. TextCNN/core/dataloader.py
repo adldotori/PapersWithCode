@@ -6,7 +6,6 @@ import pickle
 import argparse
 import numpy as np
 import pandas as pd
-from abc import *
 
 import torch
 import torch.nn as nn
@@ -18,7 +17,6 @@ from torch.nn.utils.rnn import pad_sequence
 from gensim.models import KeyedVectors
 from gensim.models import Word2Vec 
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class Vocabulary(object):
     def __init__(self):
@@ -59,6 +57,18 @@ class CustomDataset(Dataset):
         self.dataset = self._call_data()
         print('>>> Word2Vec loading...')
         # self.model = KeyedVectors.load_word2vec_format('../data/GoogleNews-vectors-negative300.bin', binary=True)   
+
+    def collate_fn(self, data):
+        """
+        add padding for text of various lengths
+        Args:
+            [(text(tensor), label(tensor)), ...]
+        Returns:
+            text(tensor), label(tensor)
+        """
+        text, label = zip(*data)
+        text = pad_sequence(text, batch_first=True, padding_value=self.vocab('<pad>'))
+        return text, label
 
     def _build_vocab(self):
         """
@@ -162,11 +172,6 @@ class MR(CustomDataset):
 
         return data
 
-def collate_fn(data):
-    text, label = zip(*data)
-    text = pad_sequence(text, batch_first=True)
-    return text, label
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Dataset Builder')
     parser.add_argument('-b', '--batch_size', type=int, default=2)
@@ -176,7 +181,7 @@ if __name__ == '__main__':
     dataset = MR(args)
     data_loader = DataLoader(dataset=dataset, 
                             batch_size=args.batch_size,
-                            collate_fn=collate_fn)
+                            collate_fn=dataset.collate_fn)
 
     for i in data_loader:
         print(i)
