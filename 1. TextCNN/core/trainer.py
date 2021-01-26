@@ -97,8 +97,8 @@ class Trainer():
                 torch.save(model.state_dict(), 
                             osp.join(self.args.ck_path, f'{self.args.name}_best.pt'))
         
-        print(f'Final loss : {all_valid_loss / self.args.cv_num:.3f},\
-                 Final acc : {all_valid_acc / self.args.cv_num:.3f}')
+        print(f'\nFinal loss : {all_valid_loss / self.args.cv_num:.3f}'+
+                 f'\nFinal acc : {all_valid_acc / self.args.cv_num:.3f}')
 
     def evaluate(self, model, cnt):
         """

@@ -11,5 +11,4 @@ docker exec -ti <image_name> bash
 
 ### TO-DO List
 L2_norm
-CV
 model variations
