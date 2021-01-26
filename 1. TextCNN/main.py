@@ -21,6 +21,8 @@ def get_args():
     parser.add_argument('--output_dim', type=int, default=1)
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--cv_num', type=int, default=10)
+    parser.add_argument('--l2_constraint', type=int, default=3)
+    parser.add_argument("--cv", type=bool)
     args = parser.parse_args()
     return args
 

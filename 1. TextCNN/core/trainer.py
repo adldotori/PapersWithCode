@@ -49,9 +49,9 @@ class Trainer():
 
         for i in range(self.args.cv_num):
             model = CNN(self.vocab_size, self.pad_idx, self.args).to(device)
-            optimizer = optim.Adam(model.parameters())
+            optimizer = optim.Adadelta(model.parameters())
             model.train()
-            
+
             # generate train dataset
             print(f'>>> {i+1}th dataset is testset')
             dataset = self.dataset_list.copy()
@@ -74,12 +74,15 @@ class Trainer():
 
                     predictions = model(text).squeeze(1)
                     loss = self.criterion(predictions, label)
-                    
                     acc = self._binary_accuracy(predictions, label)
                     
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
+
+                    with torch.no_grad():
+                        if torch.norm(model.fc.weight) > self.args.l2_constraint:
+                            model.fc.weight *= self.args.l2_constraint / torch.norm(model.fc.weight)
 
                     pbar.set_description(
                         (
@@ -96,6 +99,9 @@ class Trainer():
                 best_valid_loss = valid_loss
                 torch.save(model.state_dict(), 
                             osp.join(self.args.ck_path, f'{self.args.name}_best.pt'))
+
+            if not self.args.cv:
+                return
         
         print(f'\nFinal loss : {all_valid_loss / self.args.cv_num:.3f}'+
                  f'\nFinal acc : {all_valid_acc / self.args.cv_num:.3f}')
@@ -159,6 +165,8 @@ if __name__ == '__main__':
     parser.add_argument('--output_dim', type=int, default=1)
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--cv_num', type=int, default=10)
+    parser.add_argument('--l2_constraint', type=int, default=3)
+    parser.add_argument("--cv", type=bool)
     args = parser.parse_args()
 
     trainer = Trainer(args)
