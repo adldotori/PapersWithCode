@@ -1,12 +1,12 @@
 import os
 import os.path as osp
-import pandas as pd
 import re
 import pickle
 import argparse
 import random
 from tqdm import tqdm
 import numpy as np
+import functools
 
 import torch
 import torch.nn as nn
@@ -28,21 +28,15 @@ class Trainer():
 
         # data
         dataset = MR(args)
-        train_size = int(0.9 * len(dataset))
-        train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, len(dataset) - train_size])
-        self.train_loader = DataLoader(dataset=train_dataset, 
-                                      batch_size=args.batch_size,
-                                      shuffle=True,
-                                      collate_fn=dataset.collate_fn)
-        self.test_loader = DataLoader(dataset=test_dataset, 
-                                      batch_size=args.batch_size,
-                                      shuffle=True,
-                                      collate_fn=dataset.collate_fn)
-        # self.data_loader = self._sample_data(self.data_loader_)
+        self.collate_fn = dataset.collate_fn
+        train_size = int(1 / args.cv_num * len(dataset))
+        self.dataset_list = torch.utils.data.random_split(dataset, 
+                                            [train_size for i in range(args.cv_num - 1)] +\
+                                            [len(dataset) - (args.cv_num - 1) * train_size])
 
-        # model, optimizer, loss
-        self.model = CNN1d(dataset.vocab.idx, args).to(device)
-        self.optimizer = optim.Adam(self.model.parameters(), betas=(0.9, 0.98), eps=1e-9)
+        # arguments, loss
+        self.vocab_size = dataset.vocab.idx
+        self.pad_idx = dataset.vocab(dataset.vocab.PAD_TOKEN)
         self.criterion = nn.BCEWithLogitsLoss().to(device)
 
         # make directory if not exist data path
@@ -51,57 +45,92 @@ class Trainer():
 
     def train(self):        
         best_valid_loss = 1e9
+        all_valid_loss, all_valid_acc = 0, 0
 
-        self.model.train()
+        for i in range(self.args.cv_num):
+            model = CNN(self.vocab_size, self.pad_idx, self.args).to(device)
+            optimizer = optim.Adam(model.parameters())
+            model.train()
+            
+            # generate train dataset
+            print(f'>>> {i+1}th dataset is testset')
+            dataset = self.dataset_list.copy()
+            del dataset[i]
+            dataset = functools.reduce(lambda x, y: x + y, dataset)
         
-        for epoch in range(self.args.epochs):
-            pbar = tqdm(self.train_loader)
+            data_loader = DataLoader(dataset=dataset, 
+                                      batch_size=self.args.batch_size,
+                                      shuffle=True,
+                                      collate_fn=self.collate_fn)
 
-            for i, batch in enumerate(pbar):
-                text, label = batch
-                text = text.to(device)
-                label = label.to(device)
+            for epoch in range(self.args.epochs):
 
-                predictions = self.model(text).squeeze(1)
-                loss = self.criterion(predictions, label)
-                
-                acc = self._binary_accuracy(predictions, label)
-                
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+                pbar = tqdm(data_loader)
 
-                pbar.set_description(
-                    (
-                        f"loss : {loss.item():.4f}, acc : {acc.item():.4f}"
+                for batch in pbar:
+                    text, label = batch
+                    text = text.to(device)
+                    label = label.to(device)
+
+                    predictions = model(text).squeeze(1)
+                    loss = self.criterion(predictions, label)
+                    
+                    acc = self._binary_accuracy(predictions, label)
+                    
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                    pbar.set_description(
+                        (
+                            f"loss : {loss.item():.4f}, acc : {acc.item():.4f}"
+                        )
                     )
-                )
 
-            valid_loss, valid_acc = self.evaluate()
+            valid_loss, valid_acc = self.evaluate(model, i)
+            all_valid_loss += valid_loss.item()
+            all_valid_acc += valid_acc.item()
             print(f'valid loss : {valid_loss.item():.3f}, valid acc : {valid_acc.item():.3f}')
 
             if valid_loss < best_valid_loss:
                 best_valid_loss = valid_loss
-                torch.save(self.model.state_dict(), 
+                torch.save(model.state_dict(), 
                             osp.join(self.args.ck_path, f'{self.args.name}_best.pt'))
+        
+        print(f'Final loss : {all_valid_loss / self.args.cv_num:.3f},\
+                 Final acc : {all_valid_acc / self.args.cv_num:.3f}')
 
-    def evaluate(self):
+    def evaluate(self, model, cnt):
+        """
+        get loss, accuracy about test dataset
+        Args:
+            model(CNN) : trained model
+            cnt(int) : test dataset's number in dataset
+        Returns:
+            loss(float), acc(float)
+        """
         loss, acc = 0, 0
 
-        self.model.eval()
+        model.eval()
+
+        data_loader = DataLoader(dataset=self.dataset_list[cnt], 
+                                 batch_size=self.args.batch_size,
+                                 shuffle=True,
+                                 collate_fn=self.collate_fn)
+
         with torch.no_grad():
-            for batch in self.test_loader:
+            for batch in data_loader:
                 text, label = batch
                 text = text.to(device)
                 label = label.to(device)
-                predictions = self.model(text).squeeze(1)
+                predictions = model(text).squeeze(1)
                 
                 loss += self.criterion(predictions, label)
                 
                 acc += self._binary_accuracy(predictions, label)
 
-        loss /= len(self.test_loader)
-        acc /= len(self.test_loader)
+        loss /= len(data_loader)
+        acc /= len(data_loader)
 
         return loss, acc
 
@@ -129,7 +158,7 @@ if __name__ == '__main__':
     parser.add_argument('--filter_sizes', type=list, default=[3,4,5])
     parser.add_argument('--output_dim', type=int, default=1)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--pad_idx', type=int, default=0)
+    parser.add_argument('--cv_num', type=int, default=10)
     args = parser.parse_args()
 
     trainer = Trainer(args)

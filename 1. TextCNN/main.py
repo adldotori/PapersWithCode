@@ -1,6 +1,5 @@
 import os
 import os.path as osp
-import pandas as pd
 import re
 import pickle
 import argparse
@@ -21,7 +20,7 @@ def get_args():
     parser.add_argument('--filter_sizes', type=list, default=[3,4,5])
     parser.add_argument('--output_dim', type=int, default=1)
     parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--pad_idx', type=int, default=0)
+    parser.add_argument('--cv_num', type=int, default=10)
     args = parser.parse_args()
     return args
 

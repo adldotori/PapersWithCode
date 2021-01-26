@@ -1,3 +1,4 @@
-pandas
-torchtext
-spacy
+torch
+gensim
+numpy
+tqdm

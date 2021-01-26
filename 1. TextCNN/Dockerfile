@@ -13,7 +13,6 @@ RUN apt-get install -y git build-essential \
   pkg-config libunwind-dev \
   zlib1g-dev libssl-dev
 
-RUN python -m spacy download en
 RUN pip install --upgrade pip
 ADD requirements.txt /app/
 RUN pip install -r /app/requirements.txt

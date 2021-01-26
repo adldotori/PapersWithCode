@@ -1,12 +1,11 @@
 version: '3'
 
 services:
-
-  transformer:
+  textcnn:
     build:
       context: .
       dockerfile: Dockerfile
-    image: transformer
+    image: textcnn
     restart: always
     ports:
       - "80:8000"
