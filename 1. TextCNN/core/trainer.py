@@ -15,6 +15,7 @@ import torch.optim as optim
 from .model import *
 from .dataloader import *
 
+
 SEED = 17
 random.seed(SEED)
 np.random.seed(SEED)
@@ -37,6 +38,7 @@ class Trainer():
         # arguments, loss
         self.vocab_size = dataset.vocab.idx
         self.pad_idx = dataset.vocab(dataset.vocab.PAD_TOKEN)
+        self.embeddings = dataset.pretrained_embeddings
         self.criterion = nn.BCEWithLogitsLoss().to(device)
 
         # make directory if not exist data path
@@ -48,8 +50,20 @@ class Trainer():
         all_valid_loss, all_valid_acc = 0, 0
 
         for i in range(self.args.cv_num):
-            model = CNN(self.vocab_size, self.pad_idx, self.args).to(device)
-            optimizer = optim.Adadelta(model.parameters())
+            model = TextCNN(self.vocab_size, self.pad_idx, self.args).to(device)
+
+            # model variations
+            if self.args.mode == 'static':
+                model.embedding.weight.data.copy_(self.embeddings)
+                model.embedding.weight.requires_grad = False
+            elif self.args.mode == 'non-static':
+                model.embedding.weight.data.copy_(self.embeddings)
+            elif self.args.mode == 'multichannel':
+                model.embedding.weight.data.copy_(self.embeddings)
+                model.embedding2.weight.data.copy_(self.embeddings)
+                model.embedding2.weight.requires_grad = False
+
+            optimizer = optim.Adam(model.parameters())
             model.train()
 
             # generate train dataset
@@ -80,9 +94,10 @@ class Trainer():
                     loss.backward()
                     optimizer.step()
 
-                    with torch.no_grad():
-                        if torch.norm(model.fc.weight) > self.args.l2_constraint:
-                            model.fc.weight *= self.args.l2_constraint / torch.norm(model.fc.weight)
+                    # with torch.no_grad():
+                    #     for name, param in model.named_parameters():
+                    #         if torch.norm(param.data) > self.args.l2_constraint:
+                    #             param.data *= self.args.l2_constraint / (1e-7 + torch.norm(param.data))
 
                     pbar.set_description(
                         (
@@ -155,6 +170,7 @@ class Trainer():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trainer')
     parser.add_argument('--name', type=str, default='base')
+    parser.add_argument('--mode', type=str, choices=['rand','static','non-static','multichannel'], default='rand')
     parser.add_argument('--ck_path', type=str, default='../checkpoint')
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--batch_size', type=int, default=50)

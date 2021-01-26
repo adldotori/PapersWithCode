@@ -1,59 +1,47 @@
 import argparse
 import numpy as np
+import os.path as osp
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class CNN(nn.Module):
+
+class TextCNN(nn.Module):
     def __init__(self, vocab_size, pad_idx, args):
         super().__init__()
-        
+        self.args = args
         self.embedding = nn.Embedding(vocab_size, args.embedding_dim, padding_idx = pad_idx)
+        self.embedding2 = nn.Embedding(vocab_size, args.embedding_dim, padding_idx = pad_idx)
         
-        self.conv_0 = nn.Conv2d(in_channels = 1, 
-                                out_channels = args.n_filters, 
-                                kernel_size = (args.filter_sizes[0], args.embedding_dim))
-        
-        self.conv_1 = nn.Conv2d(in_channels = 1, 
-                                out_channels = args.n_filters, 
-                                kernel_size = (args.filter_sizes[1], args.embedding_dim))
-        
-        self.conv_2 = nn.Conv2d(in_channels = 1, 
-                                out_channels = args.n_filters, 
-                                kernel_size = (args.filter_sizes[2], args.embedding_dim))
+        self.convs = nn.ModuleList([
+                                    nn.Conv2d(in_channels = 1, 
+                                              out_channels = args.n_filters, 
+                                              kernel_size = (fs, args.embedding_dim)) 
+                                    for fs in args.filter_sizes
+                                    ])
         
         self.fc = nn.Linear(len(args.filter_sizes) * args.n_filters, args.output_dim)
         
         self.dropout = nn.Dropout(args.dropout)
         
     def forward(self, text):
-                
         #text = [batch size, sent len]
+        embedded = self.embedding(text) # [batch size, sent len, emb dim]
+        embedded = embedded.unsqueeze(1) # [batch size, 1, sent len, emb dim]
         
-        embedded = self.embedding(text)
-                
-        #embedded = [batch size, sent len, emb dim]
-        
-        embedded = embedded.unsqueeze(1)
-        
-        #embedded = [batch size, 1, sent len, emb dim]
-        
-        conved_0 = F.relu(self.conv_0(embedded).squeeze(3))
-        conved_1 = F.relu(self.conv_1(embedded).squeeze(3))
-        conved_2 = F.relu(self.conv_2(embedded).squeeze(3))
-            
-        #conved_n = [batch size, n_filters, sent len - filter_sizes[n] + 1]
-        
-        pooled_0 = F.max_pool1d(conved_0, conved_0.shape[2]).squeeze(2)
-        pooled_1 = F.max_pool1d(conved_1, conved_1.shape[2]).squeeze(2)
-        pooled_2 = F.max_pool1d(conved_2, conved_2.shape[2]).squeeze(2)
-        
-        #pooled_n = [batch size, n_filters]
-        
-        cat = self.dropout(torch.cat((pooled_0, pooled_1, pooled_2), dim = 1))
+        conved = [F.relu(conv(embedded)).squeeze(3) for conv in self.convs] # [batch size, n_filters, sent len - filter_sizes[n] + 1]
 
-        #cat = [batch size, n_filters * len(filter_sizes)]
+        if self.args.mode == 'multichannel':
+            embedded2 = self.embedding2(text) # [batch size, sent len, emb dim]
+            embedded2 = embedded2.unsqueeze(1) # [batch size, 1, sent len, emb dim]
+            
+            conved2 = [F.relu(conv(embedded2)).squeeze(3) for conv in self.convs]
+                
+            conved = [conved[i] + conved2[i] for i in range(len(conved))]
+
+        pooled = [F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved] # pooled_n = [batch size, n_filters]
+        cat = self.dropout(torch.cat(pooled, dim = 1)) # [batch size, n_filters * len(filter_sizes)]
             
         return self.fc(cat)
 

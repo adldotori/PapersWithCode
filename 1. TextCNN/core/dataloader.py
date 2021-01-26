@@ -5,6 +5,7 @@ import re
 import pickle
 import argparse
 import numpy as np
+from random import randint
 
 import torch
 import torch.nn as nn
@@ -14,7 +15,6 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 
 from gensim.models import KeyedVectors
-from gensim.models import Word2Vec 
 
 
 class Vocabulary(object):
@@ -64,8 +64,11 @@ class CustomDataset(Dataset):
         self._build_vocab()
         print('>>> Dataset loading...')
         self.dataset = self._call_data()
+
         print('>>> Word2Vec loading...')
-        # self.model = KeyedVectors.load_word2vec_format('../data/GoogleNews-vectors-negative300.bin', binary=True)   
+        word2vec = KeyedVectors.load_word2vec_format(osp.join(args.path, 'GoogleNews-vectors-negative300.bin.gz'), binary=True)   
+        print('>>> Word2Vec loaded')
+        self.pretrained_embeddings = self._build_embeddings(word2vec)
 
     def collate_fn(self, data):
         """
@@ -73,12 +76,30 @@ class CustomDataset(Dataset):
         Args:
             [(text(tensor), label(tensor)), ...]
         Returns:
-            text(tensor), label(tensor)
+            tensor, tensor : text, label
         """
         text, label = zip(*data)
         text = pad_sequence(text, batch_first=True, padding_value=self.vocab('<pad>'))
         label = torch.stack(label, 0)
         return text, label
+
+    def _build_embeddings(self, model):
+        """
+        adapt pretrained vector to embedding vector
+        Args:
+            model(Word2VecKeyedVectors)
+        Returns:
+            (tensor)
+        """
+        new_embeddings = []
+        for (word, idx) in self.vocab.word2idx.items():
+            try:
+                new_embeddings.append(model[word])
+            except KeyError:
+                value = randint(0, len(model.index2word))
+                a = np.var(model[model.index2word[value]])
+                new_embeddings.append(np.random.uniform(-a, a, 300))
+        return torch.tensor(new_embeddings)
 
     def _build_vocab(self):
         """

@@ -10,4 +10,3 @@ docker exec -ti <image_name> bash
 ```
 
 ### TO-DO List
-model variations
