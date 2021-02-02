@@ -12,7 +12,8 @@ class TextCNN(nn.Module):
         super().__init__()
         self.args = args
         self.embedding = nn.Embedding(vocab_size, args.embedding_dim, padding_idx = pad_idx)
-        self.embedding2 = nn.Embedding(vocab_size, args.embedding_dim, padding_idx = pad_idx)
+        if self.args.mode == 'multichannel':
+            self.embedding2 = nn.Embedding(vocab_size, args.embedding_dim, padding_idx = pad_idx)
         
         self.convs = nn.ModuleList([
                                     nn.Conv2d(in_channels = 1, 
@@ -21,9 +22,9 @@ class TextCNN(nn.Module):
                                     for fs in args.filter_sizes
                                     ])
         
-        self.fc = nn.Linear(len(args.filter_sizes) * args.n_filters, args.output_dim)
-        
+        self.fc = nn.Linear(len(args.filter_sizes) * args.n_filters, 2)
         self.dropout = nn.Dropout(args.dropout)
+        self.softmax = nn.Softmax(dim=1)
         
     def forward(self, text):
         #text = [batch size, sent len]
@@ -42,8 +43,9 @@ class TextCNN(nn.Module):
 
         pooled = [F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved] # pooled_n = [batch size, n_filters]
         cat = self.dropout(torch.cat(pooled, dim = 1)) # [batch size, n_filters * len(filter_sizes)]
-            
-        return self.fc(cat)
+        res = self.fc(cat) # [batch_size, 2]
+        res = self.softmax(res) # [batch_size, 2]
+        return res[:,0] # [batch_size]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='CNN Model Builder')

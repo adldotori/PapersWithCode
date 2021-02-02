@@ -14,7 +14,7 @@ import torch.optim as optim
 
 from .model import *
 from .dataloader import *
-
+from .utils import *
 
 SEED = 17
 random.seed(SEED)
@@ -22,6 +22,7 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 
 class Trainer():
     def __init__(self, args):
@@ -86,24 +87,15 @@ class Trainer():
                     text = text.to(device)
                     label = label.to(device)
 
-                    predictions = model(text).squeeze(1)
+                    predictions = model(text)
                     loss = self.criterion(predictions, label)
-                    acc = self._binary_accuracy(predictions, label)
+                    acc = self._binary_accuracy(predictions, label)                    
                     
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
 
-                    # with torch.no_grad():
-                    #     for name, param in model.named_parameters():
-                    #         if torch.norm(param.data) > self.args.l2_constraint:
-                    #             param.data *= self.args.l2_constraint / (1e-7 + torch.norm(param.data))
-
-                    pbar.set_description(
-                        (
-                            f"loss : {loss.item():.4f}, acc : {acc.item():.4f}"
-                        )
-                    )
+                    pbar.set_description((f"loss : {loss.item():.4f}, acc : {acc.item():.4f}"))
 
             valid_loss, valid_acc = self.evaluate(model, i)
             all_valid_loss += valid_loss.item()
@@ -113,7 +105,7 @@ class Trainer():
             if valid_loss < best_valid_loss:
                 best_valid_loss = valid_loss
                 torch.save(model.state_dict(), 
-                            osp.join(self.args.ck_path, f'{self.args.name}_best.pt'))
+                            osp.join(self.args.ck_path, f'{self.args.name}_{self.args.mode}_best.pt'))
 
             if not self.args.cv:
                 return
@@ -144,7 +136,7 @@ class Trainer():
                 text, label = batch
                 text = text.to(device)
                 label = label.to(device)
-                predictions = model(text).squeeze(1)
+                predictions = model(text)
                 
                 loss += self.criterion(predictions, label)
                 
@@ -156,9 +148,16 @@ class Trainer():
         return loss, acc
 
     def _binary_accuracy(self, preds, y):
-        # round predictions to the closest integer
-        rounded_preds = torch.round(torch.sigmoid(preds))
-        correct = (rounded_preds == y).float() #convert into float for division 
+        """
+        get accuracy when given the correct answer and prediction
+        Args:
+            preds(tensor) : prediction value
+            y(tensor) : real data's value
+        Returns:
+            acc(float)
+        """
+        rounded_preds = torch.round(preds)
+        correct = (rounded_preds == y).float()
         acc = correct.sum() / len(correct)
         return acc
             
@@ -167,12 +166,42 @@ class Trainer():
             for batch in loader:
                 yield batch
 
+
+class Chat():
+    def __init__(self, args):
+        # vocabulary load
+        with open(osp.join(args.ck_path, 'mr.p'), 'rb') as f:
+            self.vocab = pickle.load(f)
+        self.vocab_size = self.vocab.idx
+        self.pad_idx = self.vocab(self.vocab.PAD_TOKEN)
+
+        self.min_length = args.filter_sizes[-1]
+
+        # model load
+        self.model = TextCNN(self.vocab_size, self.pad_idx, args).to(device)
+        self.model.load_state_dict(torch.load(osp.join(args.ck_path, f'{args.name}_{args.mode}_best.pt')))
+        self.model.eval()
+    
+    def talk(self):
+        """
+        Determines whether a given sentence is positive or negative
+        """ 
+        while True:
+            input_str = preprocess(input('>>> ')) # clean and tokenize sentence
+            input_str = [self.vocab(i) for i in input_str] # change vocab to idx with vocabulary
+            if len(input_str) < self.min_length: # if a give sentence is too short, add padding
+                input_str += [self.pad_idx for i in range(self.min_length - len(input_str))]
+
+            input_str = torch.tensor(input_str).to(device).unsqueeze(0)
+            predictions = self.model(input_str)
+            print(f'{predictions.item():.2f}')
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trainer')
     parser.add_argument('--name', type=str, default='base')
     parser.add_argument('--mode', type=str, choices=['rand','static','non-static','multichannel'], default='rand')
     parser.add_argument('--ck_path', type=str, default='../checkpoint')
-    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--epochs', type=int, default=0)
     parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--path', type=str, default='../data')
     parser.add_argument('--embedding_dim', type=int, default=100)
@@ -187,3 +216,5 @@ if __name__ == '__main__':
 
     trainer = Trainer(args)
     trainer.train()
+
+    chat = Chat(args)

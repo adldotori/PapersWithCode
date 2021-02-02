@@ -2,12 +2,13 @@ version: '3'
 
 services:
   textcnn:
+    container_name: textcnn
     build:
       context: .
       dockerfile: Dockerfile
     image: textcnn
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
     restart: always
-    ports:
-      - "80:8000"
     volumes:
       - "./:/app/"

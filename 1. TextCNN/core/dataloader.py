@@ -1,7 +1,6 @@
 import os
 import os.path as osp
 import random
-import re
 import pickle
 import argparse
 import numpy as np
@@ -15,6 +14,8 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 
 from gensim.models import KeyedVectors
+
+from .utils import *
 
 
 class Vocabulary(object):
@@ -52,7 +53,7 @@ class Vocabulary(object):
 
 class CustomDataset(Dataset):
     def __init__(self, args):
-        super(Dataset, self).__init__()
+        super().__init__()
 
         self.args = args
         
@@ -60,13 +61,14 @@ class CustomDataset(Dataset):
         if not osp.isdir(args.path): 
             os.makedirs(args.path, exist_ok=True)
 
+        print('>>> Vocab building...')
         self.vocab = Vocabulary()
         self._build_vocab()
         print('>>> Dataset loading...')
         self.dataset = self._call_data()
 
         print('>>> Word2Vec loading...')
-        word2vec = KeyedVectors.load_word2vec_format(osp.join(args.path, 'GoogleNews-vectors-negative300.bin.gz'), binary=True)   
+        word2vec = KeyedVectors.load_word2vec_format(osp.join(args.path, 'GoogleNews-vectors-negative300.bin.gz'), binary=True, limit=500000)   
         print('>>> Word2Vec loaded')
         self.pretrained_embeddings = self._build_embeddings(word2vec)
 
@@ -99,6 +101,7 @@ class CustomDataset(Dataset):
                 value = randint(0, len(model.index2word))
                 a = np.var(model[model.index2word[value]])
                 new_embeddings.append(np.random.uniform(-a, a, 300))
+
         return torch.tensor(new_embeddings)
 
     def _build_vocab(self):
@@ -123,40 +126,6 @@ class CustomDataset(Dataset):
         """
         pass
 
-    def _clean_str(self, string):
-        """
-        clean string from the input sentence to normalize it
-        Args:
-            string(str)
-        Returns:
-            (str)
-        """
-        string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)
-        string = re.sub(r"\'s", " \'s", string)
-        string = re.sub(r"\'ve", " \'ve", string)
-        string = re.sub(r"n\'t", " n\'t", string)
-        string = re.sub(r"\'re", " \'re", string)
-        string = re.sub(r"\'d", " \'d", string)
-        string = re.sub(r"\'ll", " \'ll", string)
-        string = re.sub(r",", " , ", string)
-        string = re.sub(r"!", " ! ", string)
-        string = re.sub(r"\(", " \( ", string)
-        string = re.sub(r"\)", " \) ", string)
-        string = re.sub(r"\?", " \? ", string)
-        string = re.sub(r"\s{2,}", " ", string)
-
-        return self._tokenize(string.strip())
-
-    def _tokenize(self, string):
-        """
-        Divide string to token
-        Args:
-            string(str)
-        Returns:
-            [str]
-        """
-        return string.split(' ')
-
     def __getitem__(self, index):
         return torch.tensor(self.dataset[index][0]), torch.tensor(float(self.dataset[index][1]))
 
@@ -165,9 +134,14 @@ class CustomDataset(Dataset):
 
 
 class MR(CustomDataset):
+    """
+    <MR dataset>
+    Can build vocabulary file with MR datset
+    Call MR Data in order 
+    """
     def _build_vocab(self):
-        if osp.isfile(osp.join(self.args.path, 'mr.p')):
-            with open(osp.join(self.args.path, 'mr.p'), 'rb') as f:
+        if osp.isfile(osp.join(self.args.ck_path, 'mr.p')):
+            with open(osp.join(self.args.ck_path, 'mr.p'), 'rb') as f:
                 self.vocab = pickle.load(f)
 
         else:
@@ -175,16 +149,16 @@ class MR(CustomDataset):
             with open(osp.join(self.args.path, 'rt-polarity.pos'),'rb') as f:
                 pos = f.readlines()
                 for i in pos:
-                    tokens = self._clean_str(i.decode('latin1'))
+                    tokens = preprocess(i.decode('latin1'))
                     all_tokens += tokens
 
             with open(osp.join(self.args.path, 'rt-polarity.neg'),'rb') as f:
                 neg = f.readlines()
                 for i in neg:
-                    tokens = self._clean_str(i.decode('latin1'))
+                    tokens = preprocess(i.decode('latin1'))
                     all_tokens += tokens
             self.vocab.build_vocab(all_tokens)
-            with open(osp.join(self.args.path, 'mr.p'), 'wb') as f:
+            with open(osp.join(self.args.ck_path, 'mr.p'), 'wb') as f:
                 pickle.dump(self.vocab, f)
 
     def _call_data(self):
@@ -192,13 +166,13 @@ class MR(CustomDataset):
         with open(osp.join(self.args.path, 'rt-polarity.pos'),'rb') as f:
             pos = f.readlines()
             for i in pos:
-                tokens = self._clean_str(i.decode('latin1'))
+                tokens = preprocess(i.decode('latin1'))
                 data.append(([self.vocab(i) for i in tokens], 1))
 
         with open(osp.join(self.args.path, 'rt-polarity.neg'),'rb') as f:
             neg = f.readlines()
             for i in neg:
-                tokens = self._clean_str(i.decode('latin1'))
+                tokens = preprocess(i.decode('latin1'))
                 data.append(([self.vocab(i) for i in tokens], 0))
 
         return data
