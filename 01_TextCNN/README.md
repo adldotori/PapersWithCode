@@ -101,7 +101,7 @@ Example
 2. 1 + sigmoid : final output dim (batch, 1) + sigmoid
 
 |   | 2 + softmax | 1 + sigmoid  |
-|---|---|---|---|---|
+|---|---|---|
 | rand  |  0.700 | 0.725 |
 | static  | 0.789  | 0.785  | 
 | non-static  | 0.784  | 0.780 |
