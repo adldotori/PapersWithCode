@@ -46,7 +46,14 @@ class Trainer():
         if not osp.isdir(args.ck_path): 
             os.makedirs(args.ck_path, exist_ok=True)
 
-    def train(self):        
+    def train(self):
+        """
+        training
+        Args:
+            None
+        Returns:
+            None
+        """
         best_valid_loss = 1e9
         all_valid_loss, all_valid_acc = 0, 0
 
@@ -87,16 +94,19 @@ class Trainer():
                     text = text.to(device)
                     label = label.to(device)
 
+                    # forward
                     predictions = model(text)
                     loss = self.criterion(predictions, label)
                     acc = self._binary_accuracy(predictions, label)                    
                     
+                    # backward
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-
+                            
                     pbar.set_description((f"loss : {loss.item():.4f}, acc : {acc.item():.4f}"))
 
+            #  evaluate
             valid_loss, valid_acc = self.evaluate(model, i)
             all_valid_loss += valid_loss.item()
             all_valid_acc += valid_acc.item()
@@ -136,10 +146,9 @@ class Trainer():
                 text, label = batch
                 text = text.to(device)
                 label = label.to(device)
+
                 predictions = model(text)
-                
                 loss += self.criterion(predictions, label)
-                
                 acc += self._binary_accuracy(predictions, label)
 
         loss /= len(data_loader)

@@ -6,12 +6,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class TextCNN(nn.Module):
     def __init__(self, vocab_size, pad_idx, args):
         super().__init__()
         self.args = args
         self.embedding = nn.Embedding(vocab_size, args.embedding_dim, padding_idx = pad_idx)
+
         if self.args.mode == 'multichannel':
             self.embedding2 = nn.Embedding(vocab_size, args.embedding_dim, padding_idx = pad_idx)
         

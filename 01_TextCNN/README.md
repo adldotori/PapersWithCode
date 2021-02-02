@@ -89,9 +89,20 @@ Example
 0.01
 >>> this film is fantastic
 1.00
->>> i don't know this film is good
+>>> i don't know why this film is good
 0.01
 ```
 
 ## Result
+### MR Dataset
 
+**10 fold cross validation**
+1. 2 + softmax : final output dim (batch, 2) + softmax + use first value
+2. 1 + sigmoid : final output dim (batch, 1) + sigmoid
+
+|   | 2 + softmax | 1 + sigmoid  |
+|---|---|---|---|---|
+| rand  |  0.700 | 0.725 |
+| static  | 0.789  | 0.785  | 
+| non-static  | 0.784  | 0.780 |
+| multichannel  | 0.796  | 0.794  | 
