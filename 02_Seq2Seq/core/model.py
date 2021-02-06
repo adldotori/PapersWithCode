@@ -10,7 +10,6 @@ import torch.nn.functional as F
 class Encoder(nn.Module):
     def __init__(self, input_dim, emb_dim, cell_dim, num_layers):
         super().__init__()
-        self.args = args
         self.embedding = nn.Embedding(input_dim, emb_dim)
         self.lstm = nn.LSTM(emb_dim, cell_dim, num_layers)
        
@@ -54,18 +53,18 @@ class Seq2Seq(nn.Module):
         return output
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Seq2Seq Model Builder')
-    args = parser.parse_args()
-
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model = Seq2Seq(args).to(device)
+    model = Seq2Seq().to(device)
     sample_src = torch.randint(20, (3, 5)).to(device)
     sample_trg = torch.randint(20, (3, 6)).to(device)
     res = model(sample_src, sample_trg)
 
-    print(res.shape)
-    print(f'The model has {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable parameters')
+    print(f'{sample_src.shape}, {sample_trg.shape} => {res.shape}')
+    print('[batch_size, in_seq_len], [batch_size, out_seq_len] => [batch_size, out_seq_len, output_dim]\n')
+    print(f'The model has {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable parameters\n')
+
+    print(model)
 
     encoder = 0
     decoder = 0
@@ -74,4 +73,4 @@ if __name__ == '__main__':
             encoder += parameter.numel()
         if 'decoder.lstm.weight' in name:
             decoder += parameter.numel()
-    print(f'encoder parameter : {encoder/1e6}M\ndecoder parameter : {decoder/1e6}M')
+    print(f'encoder parameter : {encoder/1e6}M\ndecoder parameter : {decoder/1e6}M\n')
