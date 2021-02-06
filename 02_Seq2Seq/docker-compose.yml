@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  seq2seq:
+    container_name: seq2seq
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: seq2seq
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    restart: always
+    volumes:
+      - "./:/app/"
