@@ -1,8 +1,9 @@
 import re
 
-def preprocess(string):
+def preprocess(string, vocab):
     string = clean_str(string)
     string = tokenize(string)
+    string = [vocab(vocab.SOS_TOKEN)] + string + [vocab(vocab.EOS_TOKEN)]
     return string
 
 def clean_str(string):

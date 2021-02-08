@@ -142,9 +142,13 @@ class FrEnCorpus(Dataset):
                 if train:
                     src = src[:-self.TEST_SIZE]
                     trg = trg[:-self.TEST_SIZE]
+                    src.sort(key=len)
+                    trg.sort(key=len)
                 else:
                     src = src[-self.TEST_SIZE:]
                     trg = trg[-self.TEST_SIZE:]
+                    src.sort(key=len)
+                    trg.sort(key=len)
 
             return src, trg
 
@@ -154,9 +158,8 @@ class FrEnCorpus(Dataset):
 
     def __getitem__(self, index):
         src, trg = self.src[index], self.trg[index]
-        src, trg = preprocess(src), preprocess(trg)
+        src, trg = preprocess(src, self.src_vocab), preprocess(trg, self.trg_vocab)
         src, trg = [self.src_vocab(i) for i in src], [self.trg_vocab(i) for i in trg]
-
         return torch.tensor(src), torch.tensor(trg)
 
     def __len__(self):
@@ -171,7 +174,7 @@ if __name__ == '__main__':
 
     train_dataset = FrEnCorpus(args, 160000, 80000, True)
     test_dataset = FrEnCorpus(args, 160000, 80000, False)
-    
+
     train_data_loader = DataLoader(dataset=train_dataset, 
                             batch_size=args.batch_size,
                             collate_fn=train_dataset.collate_fn)

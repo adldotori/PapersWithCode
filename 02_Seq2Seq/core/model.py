@@ -40,12 +40,10 @@ class Seq2Seq(nn.Module):
     EMB_DIM = 1000
     CELL_DIM = 1000
     NUM_LAYERS = 4
-    INPUT_VOCAB = 160000
-    OUTPUT_VOCAB = 80000
-    def __init__(self):
+    def __init__(self, num_src_words, num_trg_words):
         super().__init__()
-        self.encoder = Encoder(self.INPUT_VOCAB, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
-        self.decoder = Decoder(self.INPUT_VOCAB, self.OUTPUT_VOCAB, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
+        self.encoder = Encoder(num_src_words, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
+        self.decoder = Decoder(num_src_words, num_trg_words, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
         
     def forward(self, source, target): # [batch_size, in_seq_len] / [batch_size, out_seq_len]
         h_n, c_n = self.encoder(source) # [num_layers, batch_size, cell_dim] / [num_layers, batch_size, cell_dim]
@@ -55,7 +53,7 @@ class Seq2Seq(nn.Module):
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model = Seq2Seq().to(device)
+    model = Seq2Seq(160000, 80000).to(device)
     sample_src = torch.randint(20, (3, 5)).to(device)
     sample_trg = torch.randint(20, (3, 6)).to(device)
     res = model(sample_src, sample_trg)

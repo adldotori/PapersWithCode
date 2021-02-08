@@ -2,3 +2,4 @@ torch
 gensim
 numpy
 tqdm
+nltk
