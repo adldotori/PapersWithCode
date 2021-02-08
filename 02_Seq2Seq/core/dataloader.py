@@ -37,6 +37,13 @@ class Vocabulary(object):
             self.idx2word[self.idx] = word
             self.idx += 1
     
+    def pop(self):
+        word = self.idx2word[self.idx - 1]
+        del self.idx2word[self.idx - 1]
+        del self.word2idx[word]
+        self.idx -= 1
+        print(len(self.idx2word), word, len(self.word2idx), self.idx)
+
     def __call__(self, word):
         if not word in self.word2idx:
             return self.word2idx['<unk>']
@@ -60,11 +67,10 @@ class FrEnCorpus(Dataset):
         super().__init__()
         self.args = args
 
-        if train:
-            print('>>> Vocab building...')
-            self.src_vocab = self._build_vocab(self.SRC_FILE_NAME, num_src_words)
-            self.trg_vocab = self._build_vocab(self.TRG_FILE_NAME, num_trg_words)
-            print(f'>>> Vocab Length : {len(self.src_vocab)} / {len(self.trg_vocab)}')
+        print('>>> Vocab building...')
+        self.src_vocab = self._build_vocab(self.SRC_FILE_NAME, num_src_words)
+        self.trg_vocab = self._build_vocab(self.TRG_FILE_NAME, num_trg_words)
+        print(f'>>> Vocab Length : {len(self.src_vocab)} / {len(self.trg_vocab)}')
 
         print('>>> Dataset loading...')
         self.src, self.trg = self._read_data(self.SRC_FILE_NAME, self.TRG_FILE_NAME, train)
@@ -114,11 +120,11 @@ class FrEnCorpus(Dataset):
 
             vocab = Vocabulary()
             for i, (key, value) in enumerate(sorted(vocab_dict.items(), key=lambda item: -item[1])):
-                if i == num_words:
+                if len(vocab) == num_words:
                     break
                 vocab.add(key)
 
-            with open(osp.join(self.args.ck_path, file_name+'.vocab'), 'wb') as f:
+            with open(osp.join(self.args.vocab_path, file_name+'.vocab'), 'wb') as f:
                 pickle.dump(vocab, f)
 
             return vocab
@@ -158,7 +164,9 @@ class FrEnCorpus(Dataset):
 
     def __getitem__(self, index):
         src, trg = self.src[index], self.trg[index]
-        src, trg = preprocess(src, self.src_vocab), preprocess(trg, self.trg_vocab)
+        src, trg = preprocess(src), preprocess(trg)
+        src = [self.src_vocab.SOS_TOKEN] + src + [self.src_vocab.EOS_TOKEN]
+        trg = [self.trg_vocab.SOS_TOKEN] + trg + [self.trg_vocab.EOS_TOKEN]
         src, trg = [self.src_vocab(i) for i in src], [self.trg_vocab(i) for i in trg]
         return torch.tensor(src), torch.tensor(trg)
 

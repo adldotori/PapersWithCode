@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from nltk.translate.bleu_score import sentence_bleu
+
 from model import *
 from dataloader import *
 from utils import *
@@ -34,12 +36,13 @@ class Trainer():
         # data
         train_dataset = FrEnCorpus(args, self.NUM_SRC_WORDS, self.NUM_TRG_WORDS, True)
         test_dataset = FrEnCorpus(args, self.NUM_SRC_WORDS, self.NUM_TRG_WORDS, False)
-        
+        self.vocab = train_dataset.trg_vocab
+
         self.train_data_loader = DataLoader(dataset=train_dataset, 
                                 batch_size=args.batch_size,
                                 collate_fn=train_dataset.collate_fn)
         self.test_data_loader = DataLoader(dataset=test_dataset, 
-                                batch_size=args.batch_size,
+                                batch_size=1,
                                 collate_fn=test_dataset.collate_fn)
 
         # model
@@ -65,7 +68,7 @@ class Trainer():
             for batch in pbar:
                 src, trg = batch
                 src, trg = src.to(device), trg.to(device)
-            
+
                 # forward
                 res = self.model(src, trg[:,:-1]) # [batch_size, seq_len, num_trg_words]
                 res = res.permute(0, 2, 1) # [batch_size, num_trg_words, seq_len]
@@ -77,21 +80,11 @@ class Trainer():
                 self.optim.step()
                         
                 pbar.set_description((f"loss : {loss.item():.4f}"))
+                break
 
-            #  evaluate
-        #     valid_loss, valid_acc = self.evaluate()
-        #     all_valid_loss += valid_loss.item()
-        #     all_valid_acc += valid_acc.item()
-        #     print(f'valid loss : {valid_loss.item():.3f}, valid acc : {valid_acc.item():.3f}')
-
-        #     if valid_loss < best_valid_loss:
-        #         best_valid_loss = valid_loss
-        #         torch.save(model.state_dict(), 
-        #                     osp.join(self.args.ck_path, f'{self.args.name}_{self.args.mode}_best.pt'))
-
-        
-        # print(f'\nFinal loss : {all_valid_loss / self.args.cv_num:.3f}'+
-        #          f'\nFinal acc : {all_valid_acc / self.args.cv_num:.3f}')
+            # evaluate
+            valid_score = self.evaluate()
+            print(f'valid score : {valid_score.item():.3f}')
 
     def evaluate(self):
         """
@@ -101,26 +94,32 @@ class Trainer():
         Returns:
             loss(float), BLEU score(float)
         """
-        loss, bleu_score = 0, 0
-
-        model.eval()
+        bleu_score = 0
+        self.model.eval()
 
         with torch.no_grad():
             for batch in self.test_data_loader:
                 src, trg = batch
-                src = src.to(device)
-                trg = trg.to(device)
+                src = src.to(device) # [1, in_seq_len]
+                trg = trg.to(device) # [1, out_seq_len]
+                output = torch.tensor((self.vocab(self.vocab.SOS_TOKEN),),).to(device) # [1,1]
+                
+                while True:
+                    print(src.shape, output.shape)
+                    predictions = self.model(src, output)[0] # [seq_len, num_trg_words]
+                    print(predictions.shape)
+                    index = torch.argmax(predictions[-1])
+                    output = torch.cat(output, torch.tensor((index,),), -1) # [1, x]
 
-                predictions = model(src, )
-                loss += self.criterion(predictions, label)
-                acc += self._binary_accuracy(predictions, label)
+                    if index == self.vocab(self.vocab.EOS_TOKEN):
+                        break
 
-        model.train()
-        loss /= len(data_loader)
-        acc /= len(data_loader)
+                bleu_score += sentence_bleu([trg[0][1:-1].tolist()], output[0][1:-1].tolist())
 
-        return loss, acc
-            
+        self.model.train()
+        bleu_score /= len(self.test_data_loader)
+
+        return bleu_score
 
 
 class Chat():
