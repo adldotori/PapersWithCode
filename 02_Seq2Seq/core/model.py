@@ -22,11 +22,11 @@ class Encoder(nn.Module):
         return h_n, c_n
 
 class Decoder(nn.Module):
-    def __init__(self, input_dim, output_dim, emb_dim, cell_dim, num_layers):
+    def __init__(self, input_dim, emb_dim, cell_dim, num_layers):
         super().__init__()
         self.embedding = nn.Embedding(input_dim, emb_dim)
         self.lstm = nn.LSTM(emb_dim, cell_dim, num_layers)
-        self.fc = nn.Linear(cell_dim, output_dim)
+        self.fc = nn.Linear(cell_dim, input_dim)
 
     def forward(self, text, h, c): # [batch_size, out_seq_len], [num_layers, batch_size, cell_dim], [num_layers, batch_size, cell_dim]
         emb = self.embedding(text) # [batch_size, out_seq_len, emb_dim]
@@ -43,12 +43,18 @@ class Seq2Seq(nn.Module):
     def __init__(self, num_src_words, num_trg_words):
         super().__init__()
         self.encoder = Encoder(num_src_words, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
-        self.decoder = Decoder(num_src_words, num_trg_words, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
-        
+        self.decoder = Decoder(num_trg_words, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
+        self.apply(self._init_weights)
+
     def forward(self, source, target): # [batch_size, in_seq_len] / [batch_size, out_seq_len]
         h_n, c_n = self.encoder(source) # [num_layers, batch_size, cell_dim] / [num_layers, batch_size, cell_dim]
         output = self.decoder(target, h_n, c_n) # [out_seq_len, batch_size, output_dim]]
         return output
+        
+    def _init_weights(self, m):
+        for name, param in m.named_parameters():
+            nn.init.uniform_(param.data, -0.08, 0.08)
+        
 
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

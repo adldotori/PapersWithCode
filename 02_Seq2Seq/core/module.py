@@ -70,7 +70,7 @@ class Trainer():
                 src, trg = src.to(device), trg.to(device)
 
                 # forward
-                res = self.model(src, trg[:,:-1]) # [batch_size, seq_len, num_trg_words]
+                res = self.model(src[:,::-1], trg[:,:-1]) # [batch_size, seq_len, num_trg_words]
                 res = res.permute(0, 2, 1) # [batch_size, num_trg_words, seq_len]
                 loss = self.criterion(res, trg[:,1:])   
                 
@@ -80,11 +80,10 @@ class Trainer():
                 self.optim.step()
                         
                 pbar.set_description((f"loss : {loss.item():.4f}"))
-                break
 
             # evaluate
             valid_score = self.evaluate()
-            print(f'valid score : {valid_score.item():.3f}')
+            print(f'valid score : {valid_score:.3f}')
 
     def evaluate(self):
         """
@@ -102,20 +101,17 @@ class Trainer():
                 src, trg = batch
                 src = src.to(device) # [1, in_seq_len]
                 trg = trg.to(device) # [1, out_seq_len]
-                output = torch.tensor((self.vocab(self.vocab.SOS_TOKEN),),).to(device) # [1,1]
+                output = torch.tensor(((self.vocab(self.vocab.SOS_TOKEN),),)).to(device) # [1,1]
                 
                 while True:
-                    print(src.shape, output.shape)
                     predictions = self.model(src, output)[0] # [seq_len, num_trg_words]
-                    print(predictions.shape)
                     index = torch.argmax(predictions[-1])
-                    output = torch.cat(output, torch.tensor((index,),), -1) # [1, x]
+                    output = torch.cat((output, torch.tensor(((index,),)).to(device)), -1) # [1, x]
 
                     if index == self.vocab(self.vocab.EOS_TOKEN):
                         break
 
                 bleu_score += sentence_bleu([trg[0][1:-1].tolist()], output[0][1:-1].tolist())
-
         self.model.train()
         bleu_score /= len(self.test_data_loader)
 
