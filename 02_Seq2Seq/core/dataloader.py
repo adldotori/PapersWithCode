@@ -4,7 +4,7 @@ import random
 import pickle
 import argparse
 import numpy as np
-from random import randint
+import random
 
 import torch
 import torch.nn as nn
@@ -45,10 +45,6 @@ class Vocabulary(object):
     def __len__(self):
         return len(self.word2idx)
 
-    def build_vocab(self, tokens):
-        for i in tokens:
-            self._add(i)
-
 
 class FrEnCorpus(Dataset):
     """
@@ -56,24 +52,22 @@ class FrEnCorpus(Dataset):
     Can build vocabulary file with FrEnCorpus datset
     Call FrEnCorpus Data in order 
     """
-    def __init__(self, args, num_src_words, num_trg_words):
+    SRC_FILE_NAME = 'giga-fren.release2.fixed.fr'
+    TRG_FILE_NAME = 'giga-fren.release2.fixed.en'
+    TEST_SIZE = 1000
+
+    def __init__(self, args, num_src_words, num_trg_words, train=True):
         super().__init__()
         self.args = args
 
-        # make directory if not exist data path
-        if not osp.isdir(args.path): 
-            os.makedirs(args.path, exist_ok=True)
-
-        FR_FILE_NAME = 'giga-fren.release2.fixed.fr'
-        EN_FILE_NAME = 'giga-fren.release2.fixed.en'
-
-        print('>>> Vocab building...')
-        fr = self._build_vocab(FR_FILE_NAME, num_src_words)
-        en = self._build_vocab(EN_FILE_NAME, num_trg_words)
-        print(f'>>> Vocab Length : {len(fr)} / {len(en)}')
+        if train:
+            print('>>> Vocab building...')
+            self.src_vocab = self._build_vocab(self.SRC_FILE_NAME, num_src_words)
+            self.trg_vocab = self._build_vocab(self.TRG_FILE_NAME, num_trg_words)
+            print(f'>>> Vocab Length : {len(self.src_vocab)} / {len(self.trg_vocab)}')
 
         print('>>> Dataset loading...')
-        self.dataset = self._call_data()
+        self.src, self.trg = self._read_data(self.SRC_FILE_NAME, self.TRG_FILE_NAME, train)
 
     def collate_fn(self, data):
         """
@@ -83,40 +77,42 @@ class FrEnCorpus(Dataset):
         Returns:
             tensor, tensor : text, label
         """
-        text, label = zip(*data)
-        text = pad_sequence(text, batch_first=True, padding_value=self.vocab('<pad>'))
-        label = torch.stack(label, 0)
-        return text, label
+        src_text, trg_text = zip(*data)
+        src_text = pad_sequence(src_text, batch_first=True, padding_value=self.src_vocab('<pad>'))
+        trg_text = pad_sequence(trg_text, batch_first=True, padding_value=self.trg_vocab('<pad>'))
+        return src_text, trg_text
 
-    def _build_vocab(self, file_name, num_words, max_size=1e9):
+    def _build_vocab(self, file_name, num_words, train_size=None, test_size=1000):
         """
         call or build vocabulary file
         this method must be overridden
         Args:
-            None
+            file_name(str): 
+            num_words(int):
+            max_size(int):
         Returns:
-            None
+            Vocabulary
         """
         
-        # if osp.isfile(osp.join(self.args.ck_path, file_name)): # if exist vocab file
-        #     with open(osp.join(self.args.ck_path, file_name), 'rb') as f:
-        #         return pickle.load(f)
- 
-        if osp.isfile(osp.join(self.args.path, file_name)): # only exist data file, not vocab file
-            vocab = Vocabulary()
+        if osp.isfile(osp.join(self.args.vocab_path, file_name + '.vocab')): # load vocab file if exists vocab file
+            with open(osp.join(self.args.vocab_path, file_name + '.vocab'), 'rb') as f:
+                return pickle.load(f)
+
+        if osp.isfile(osp.join(self.args.path, file_name)):
             with open(osp.join(self.args.path, file_name), 'r') as f:
-                text = True
-                cnt = 0
+
+                texts = f.readlines()[:-self.TEST_SIZE]
+
                 vocab_dict = {}
-                while text and cnt < max_size:
-                    text = preprocess(f.readline())
+                for i, text in enumerate(texts):
+                    text = preprocess(text)
                     for i in text:
                         if i in vocab_dict.keys():
                             vocab_dict[i] += 1
                         else:
                             vocab_dict[i] = 1
-                    cnt += 1
 
+            vocab = Vocabulary()
             for i, (key, value) in enumerate(sorted(vocab_dict.items(), key=lambda item: -item[1])):
                 if i == num_words:
                     break
@@ -129,36 +125,60 @@ class FrEnCorpus(Dataset):
 
         else:
             print('>>> There aren\'t data files.')
+            exit()
 
-    def _call_data(self):
+    def _read_data(self, src_file_name, trg_file_name, train):
         """
-        return cleaned and tokenized data
-        this method must be overridden
+        return src data and trg dataa
         Args:
-            None
+            src_file_name(str), trg_file_name(str), train(bool)
         Returns:
-            [(list, int)]
+            [str], [str]
         """
-        return data
+        if osp.isfile(osp.join(self.args.path, src_file_name)) and osp.isfile(osp.join(self.args.path, trg_file_name)): # only exist data file, not vocab file
+            with open(osp.join(self.args.path, src_file_name), 'r') as f1, open(osp.join(self.args.path, trg_file_name), 'r') as f2:
+                src = f1.readlines()
+                trg = f2.readlines()
+                if train:
+                    src = src[:-self.TEST_SIZE]
+                    trg = trg[:-self.TEST_SIZE]
+                else:
+                    src = src[-self.TEST_SIZE:]
+                    trg = trg[-self.TEST_SIZE:]
+
+            return src, trg
+
+        else:
+            print('>>> There aren\'t data files.')
+            exit()
 
     def __getitem__(self, index):
-        return torch.tensor(self.dataset[index][0]), torch.tensor(float(self.dataset[index][1]))
+        src, trg = self.src[index], self.trg[index]
+        src, trg = preprocess(src), preprocess(trg)
+        src, trg = [self.src_vocab(i) for i in src], [self.trg_vocab(i) for i in trg]
+
+        return torch.tensor(src), torch.tensor(trg)
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.src)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Dataset Builder')
     parser.add_argument('-b', '--batch_size', type=int, default=2)
     parser.add_argument('-p', '--path', type=str, default='../data')
-    parser.add_argument('--ck_path', type=str, default='../checkpoint')
+    parser.add_argument('--vocab_path', type=str, default='../vocab')
     args = parser.parse_args()
 
-    dataset = FrEnCorpus(args, 160000, 80000)
-    data_loader = DataLoader(dataset=dataset, 
+    train_dataset = FrEnCorpus(args, 160000, 80000, True)
+    test_dataset = FrEnCorpus(args, 160000, 80000, False)
+    
+    train_data_loader = DataLoader(dataset=train_dataset, 
                             batch_size=args.batch_size,
-                            collate_fn=dataset.collate_fn)
+                            collate_fn=train_dataset.collate_fn)
+    test_data_loader = DataLoader(dataset=test_dataset, 
+                            batch_size=args.batch_size,
+                            collate_fn=test_dataset.collate_fn)
 
-    for i in data_loader:
+    for i in train_data_loader:
         print(i)
         break 
