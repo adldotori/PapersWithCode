@@ -7,6 +7,7 @@ import random
 from tqdm import tqdm
 import numpy as np
 import functools
+import heapq
 
 import torch
 import torch.nn as nn
@@ -101,17 +102,32 @@ class Trainer():
                 src, trg = batch
                 src = src.to(device) # [1, in_seq_len]
                 trg = trg.to(device) # [1, out_seq_len]
-                output = torch.tensor(((self.vocab(self.vocab.SOS_TOKEN),),)).to(device) # [1,1]
                 
-                while True:
-                    predictions = self.model(src, output)[0] # [seq_len, num_trg_words]
-                    index = torch.argmax(predictions[-1])
-                    output = torch.cat((output, torch.tensor(((index,),)).to(device)), -1) # [1, x]
+                heap = [torch.tensor(((self.vocab(self.vocab.SOS_TOKEN),),)).to(device)] # [1,1]
 
+                while True:
+                    # remain the best elements
+                    if len(heap) > self.args.beam_size:
+                        tmp = heap.copy()
+                        heap = []
+                        for i in self.args.beam_size:
+                            heapq.heappush(heap, heapq.heappop(tmp))
+
+                    for element in heap:
+                        predictions = self.model(src, element)[0] # [seq_len, num_trg_words]
+                        values, indices = torch.topk(predictions[-1], self.args.beam_size)
+
+                        # add to heap
+                        for value, index in zip(values, indices):
+                            heapq.heappush(heap, \
+                                (-value, torch.cat((element, torch.tensor(((index,),)).to(device)), -1))) # maximum heap / [1,x]
+                        
                     if index == self.vocab(self.vocab.EOS_TOKEN):
                         break
 
+                ouptut = heapq.heappop(heap)
                 bleu_score += sentence_bleu([trg[0][1:-1].tolist()], output[0][1:-1].tolist())
+                
         self.model.train()
         bleu_score /= len(self.test_data_loader)
 
@@ -155,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--path', type=str, default='../data')
     parser.add_argument('--vocab_path', type=str, default='../vocab')
+    parser.add_argument('--beam_size', type=int, default=1)
     args = parser.parse_args()
 
     trainer = Trainer(args)
