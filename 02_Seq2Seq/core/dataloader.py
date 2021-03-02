@@ -172,7 +172,7 @@ class FrEnCorpus(Dataset):
         src = src[:100] if len(src) > 100 else src
         trg = trg[:100] if len(trg) > 100 else trg
 
-        return torch.tensor(src), torch.tensor(trg)
+        return torch.tensor(src), torch.tensor(len(src)), torch.tensor(trg)
 
     def __len__(self):
         return len(self.src)

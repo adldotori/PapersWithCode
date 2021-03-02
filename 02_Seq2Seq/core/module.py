@@ -66,11 +66,11 @@ class Trainer():
         for epoch in range(self.args.epochs):
             pbar = tqdm(self.train_data_loader)
             for batch in pbar:
-                src, trg = batch
+                src, src_len, trg = batch
                 src, trg = src.to(device), trg.to(device)
 
                 # forward
-                res = self.model(torch.flip(src, [1]), trg[:,:-1]) # [batch_size, seq_len, num_trg_words]
+                res = self.model(torch.flip(src, [1]), src_len, trg[:,:-1]) # [batch_size, seq_len, num_trg_words]
                 res = res.permute(0, 2, 1) # [batch_size, num_trg_words, seq_len]
                 loss = self.criterion(res, trg[:,1:])   
                 

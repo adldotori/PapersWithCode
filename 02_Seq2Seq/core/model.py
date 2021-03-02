@@ -13,10 +13,11 @@ class Encoder(nn.Module):
         self.embedding = nn.Embedding(input_dim, emb_dim)
         self.lstm = nn.LSTM(emb_dim, cell_dim, num_layers, batch_first=True)
        
-    def forward(self, text): # [batch_size, in_seq_len]
+    def forward(self, text, text_len): # [batch_size, in_seq_len]
         emb = self.embedding(text) # [batch_size, in_seq_len, emb_dim]
-        output, (h_n, c_n) = self.lstm(emb) # [in_seq_len, batch_size, cell_dim]
-        # h_n: [num_layers, batch_size, cell_dim]
+        packed_embedded = nn.utils.rnn.pack_padded_sequence(emb, text_len.to('cpu'))
+        output, (h_n, c_n) = self.lstm(packed_embedded) # [in_seq_len, batch_size, cell_dim]
+        # h_n: [num_layers, batch_size, cell_dim]s
         # c_n: [num_layers, batch_size, cell_dim]
         return h_n, c_n
 
