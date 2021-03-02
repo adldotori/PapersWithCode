@@ -113,7 +113,7 @@ class FrEnCorpus(Dataset):
                 for i, text in enumerate(texts):
                     text = preprocess(text)
                     for i in text:
-                        if i in vocab_dict.keys():
+                        if i in vocab_dict:
                             vocab_dict[i] += 1
                         else:
                             vocab_dict[i] = 1
@@ -168,6 +168,10 @@ class FrEnCorpus(Dataset):
         src = [self.src_vocab.SOS_TOKEN] + src + [self.src_vocab.EOS_TOKEN]
         trg = [self.trg_vocab.SOS_TOKEN] + trg + [self.trg_vocab.EOS_TOKEN]
         src, trg = [self.src_vocab(i) for i in src], [self.trg_vocab(i) for i in trg]
+
+        src = src[:100] if len(src) > 100 else src
+        trg = trg[:100] if len(trg) > 100 else trg
+
         return torch.tensor(src), torch.tensor(trg)
 
     def __len__(self):

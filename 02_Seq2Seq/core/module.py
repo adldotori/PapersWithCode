@@ -115,7 +115,7 @@ class Trainer():
         self.model.train()
         bleu_score /= len(self.test_data_loader)
 
-        return bleu_score
+        return bleu_score * 100
 
 
 class Chat():

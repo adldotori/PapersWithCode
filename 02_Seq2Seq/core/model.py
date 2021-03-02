@@ -11,11 +11,10 @@ class Encoder(nn.Module):
     def __init__(self, input_dim, emb_dim, cell_dim, num_layers):
         super().__init__()
         self.embedding = nn.Embedding(input_dim, emb_dim)
-        self.lstm = nn.LSTM(emb_dim, cell_dim, num_layers)
+        self.lstm = nn.LSTM(emb_dim, cell_dim, num_layers, batch_first=True)
        
     def forward(self, text): # [batch_size, in_seq_len]
         emb = self.embedding(text) # [batch_size, in_seq_len, emb_dim]
-        emb = emb.permute(1, 0, 2) # [in_seq_len, batch_size, emb_dim]
         output, (h_n, c_n) = self.lstm(emb) # [in_seq_len, batch_size, cell_dim]
         # h_n: [num_layers, batch_size, cell_dim]
         # c_n: [num_layers, batch_size, cell_dim]
@@ -25,12 +24,11 @@ class Decoder(nn.Module):
     def __init__(self, input_dim, emb_dim, cell_dim, num_layers):
         super().__init__()
         self.embedding = nn.Embedding(input_dim, emb_dim)
-        self.lstm = nn.LSTM(emb_dim, cell_dim, num_layers)
+        self.lstm = nn.LSTM(emb_dim, cell_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(cell_dim, input_dim)
 
     def forward(self, text, h, c): # [batch_size, out_seq_len], [num_layers, batch_size, cell_dim], [num_layers, batch_size, cell_dim]
         emb = self.embedding(text) # [batch_size, out_seq_len, emb_dim]
-        emb = emb.permute(1, 0, 2) # [out_seq_len, batch_size, emb_dim]
         output, (h_n, c_n) = self.lstm(emb, (h, c)) # [batch_size, out_seq_len, cell_dim]
         output = output.permute(1, 0, 2) # [out_seq_len, batch_size, cell_dim]
         output = self.fc(output) # [out_seq_len, batch_size, output_dim]
