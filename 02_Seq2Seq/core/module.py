@@ -15,9 +15,9 @@ import torch.optim as optim
 
 from nltk.translate.bleu_score import sentence_bleu
 
-from model import *
-from dataloader import *
-from utils import *
+from .model import *
+from .dataloader import *
+from .utils import *
 
 SEED = 17
 random.seed(SEED)
@@ -150,7 +150,7 @@ class Tranlator():
         self.vocab = train_dataset.trg_vocab
 
         # model load
-        self.model = Seq2Seq(self.NUM_SRC_WORDS, self.NUM_TRG_WORDS).to(device)
+        self.model = Seq2Seq(NUM_SRC_WORDS, NUM_TRG_WORDS).to(device)
         self.model.load_state_dict(torch.load(osp.join(args.ck_path, f'{args.name}_best.pt')))
         self.model.eval()
     
