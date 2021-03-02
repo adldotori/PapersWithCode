@@ -1,6 +1,6 @@
 # Seq2Seq
 
-> Sequence to Sequence Learning with Neural Networks 
+> Sequence to Sequence Learning with Neural Networks   
 > arxiv : <https://arxiv.org/pdf/1409.3215.pdf>
 
 ![image](img/model.png)
@@ -21,7 +21,9 @@ $ pip install -r requirements.txt
 ## Usage
 ### Train
 ```
-usage: main.py [-h] [--name NAME] [--ck_path CK_PATH] [--epochs EPOCHS] [--batch_size BATCH_SIZE] [--path PATH] [--vocab_path VOCAB_PATH] [--beam_size BEAM_SIZE]
+usage: main.py [-h] [--name NAME] [--ck_path CK_PATH]  
+[--epochs EPOCHS][--batch_size BATCH_SIZE] [--path PATH]  
+[--vocab_path VOCAB_PATH] [--beam_size BEAM_SIZE]
 
 Seq2Seq
 
@@ -37,7 +39,8 @@ optional arguments:
 ```
 ### Inference
 ```
-usage: translate.py [-h] [--name NAME] [--ck_path CK_PATH] [--path PATH] [--vocab_path VOCAB_PATH] [--beam_size BEAM_SIZE]
+usage: translate.py [-h] [--name NAME] [--ck_path CK_PATH]  
+[--path PATH] [--vocab_path VOCAB_PATH] [--beam_size BEAM_SIZE]
 
 Seq2Seq
 
