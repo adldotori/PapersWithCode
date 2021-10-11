@@ -45,8 +45,8 @@ class Seq2Seq(nn.Module):
         self.decoder = Decoder(num_trg_words, self.EMB_DIM, self.CELL_DIM, self.NUM_LAYERS)
         self.apply(self._init_weights)
 
-    def forward(self, source, target): # [batch_size, in_seq_len] / [batch_size, out_seq_len]
-        h_n, c_n = self.encoder(source) # [num_layers, batch_size, cell_dim] / [num_layers, batch_size, cell_dim]
+    def forward(self, source, src_len, target): # [batch_size, in_seq_len] / [batch_size, out_seq_len]
+        h_n, c_n = self.encoder(source, src_len) # [num_layers, batch_size, cell_dim] / [num_layers, batch_size, cell_dim]
         output = self.decoder(target, h_n, c_n) # [out_seq_len, batch_size, output_dim]]
         return output
         

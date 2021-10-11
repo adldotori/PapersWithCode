@@ -42,7 +42,6 @@ class Vocabulary(object):
         del self.idx2word[self.idx - 1]
         del self.word2idx[word]
         self.idx -= 1
-        print(len(self.idx2word), word, len(self.word2idx), self.idx)
 
     def __call__(self, word):
         if not word in self.word2idx:
@@ -83,10 +82,10 @@ class FrEnCorpus(Dataset):
         Returns:
             tensor, tensor : text, label
         """
-        src_text, trg_text = zip(*data)
+        src_text, src_len, trg_text = zip(*data)
         src_text = pad_sequence(src_text, batch_first=True, padding_value=self.src_vocab('<pad>'))
         trg_text = pad_sequence(trg_text, batch_first=True, padding_value=self.trg_vocab('<pad>'))
-        return src_text, trg_text
+        return src_text, src_len, trg_text
 
     def _build_vocab(self, file_name, num_words, train_size=None, test_size=1000):
         """
@@ -99,7 +98,6 @@ class FrEnCorpus(Dataset):
         Returns:
             Vocabulary
         """
-        
         if osp.isfile(osp.join(self.args.vocab_path, file_name + '.vocab')): # load vocab file if exists vocab file
             with open(osp.join(self.args.vocab_path, file_name + '.vocab'), 'rb') as f:
                 return pickle.load(f)
